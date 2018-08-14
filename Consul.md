@@ -24,12 +24,6 @@ Web: [robn.io](https://robn.io)
 
 ^These slides are available here, so if I fly past something you were interested in, you'll be able to find it there
 
----
-
-[.hide-footer]
-
-# Hello!
-
 ## FastMail
 
 Email done right, with some heart 💙
@@ -56,9 +50,9 @@ Email done right, with some heart 💙
 
 ^★ Consul is a little program that runs on every node on your network
 
-^★ They all talk to each other
+^★ All the nodes talk to each other. They use a consensus algorithm called Raft that arranges it so that when something changes, that change is reflected across all nodes at the same amd no matter which node you ask, you will always get the same result.
 
-^★ And provide a bunch of tools you can use to run your entire system
+^★ And then Consul builds a bunch of useful tools on top of that.
 
 ---
 
@@ -77,47 +71,6 @@ Email done right, with some heart 💙
 ^Consul has tons of interesting features. I get really excited about it because every time I look there's always something new in there and every time I have a problem, there's often a way to solve it with Consul.
 
 ^I'm only going to talk about some of these features today.
-
----
-
-[.hide-footer]
-
-# [fit] Raft
-
-^But before we can talk about Consul, we need to spend a couple of minutes talking about Raft, the technology that Consul is built on top of.
-
----
-
-# Raft
-
-## Distributed consensus algorithm
-
-* A number of nodes on the network
-* Maintain a "log" (journal) of items
-* Clients submit changes to the log
-* The nodes agree to accept it (or not)
-* Guaranteed to apply the changes on all nodes in the same order
-
-^Raft is a type of algorithm known as a "distributed consensus algorithm".
-
-^★ You have some number of nodes on the network. ★ They each maintain a log or journal of items.
-
-^★ Clients submit changes to the log, and ★ the nodes talk among themselves and decide to accept the change or not.
-
-^★ In a way that ensures that all nodes apply the changes in the same order at the same time so no matter which node you ask for stuff, you always get the same answer.
-
----
-
-# Raft
-
-## More info
-
-[https://raft.github.io/](https://raft.github.io/)
-[https://thesecretlivesofdata.com/raft/](https://thesecretlivesofdata.com/raft/)
-
-^Raft is really interesting, but its all math and stuff and knowing how it works isn't necessary for successfully operating Consul, so I'm not going to say any more about it. Here's some places you can find out more.
-
-^For our purposes, its enough to say that Consul is built on the assumption that all nodes on the network share a consistent view of the data store.
 
 ---
 
@@ -545,33 +498,6 @@ foo/quux:41
 
 ---
 
-# Key/value store
-
-```javascript
-# consul kv export foo/
-[
-  {
-    "key": "foo/bar",
-    "flags": 0,
-    "value": "MjM="
-  },
-  {
-    "key": "foo/baz",
-    "flags": 0,
-    "value": "MzI="
-  },
-  {
-    "key": "foo/quux",
-    "flags": 0,
-    "value": "NDE="
-  }
-]
-```
-
-^You can dump part of the keyspace as JSON, which is useful for bringing into other tools.
-
----
-
 [.hide-footer]
 
 # [fit] Boring
@@ -609,8 +535,6 @@ foo/quux:41
 ^The KV store offers an atomic "check and set" operation.
 
 ^★ which means "set this key, but only if it hasn't changed since I last looked at it".
-
-^This gives you a way to solve the same concurrent increment problem we have in multithreaded programs, but for distributed systems.
 
 ^★ And lets you build higher-level synchronisation primitives like distributed locks, shared queues, that sort of thing.
 
@@ -704,12 +628,9 @@ Success! Data written to: foo/bar
 
 * Broadcast a tiny bit of data to Consul nodes
 * Watcher can wait for event, then take action
-* Events are very small, but you can use the KV to coordinate!
 * Example: cache flush
 
 ^★ Lets your send a message to multiple Consul nodes at once. ★ Then you can have a watcher running on those nodes, and take action when the event arrives.
-
-^★ You can actually on fit a tiny amount of data in an event, about 512 bytes. But, you can put data into the KV store before you send the event, and when the event watchers receive it, they can just make a KV query to get the info they need to perform the action.
 
 ^★ An example we've experimented with a bit is to control cache flushes. Many services cache rarely-changing data in memory. Instead of flushing or rechecking periodically, they set up a Consul watch. When that data does change (some user or administrator action), we send a "flush your cache" event to those nodes. The watches wake up, and those services drop their caches and reload the data.
 
@@ -760,27 +681,6 @@ Success! Data written to: foo/bar
 ^★ Keeps the lock alive until the program exits (using Consul's "sessions" feature)
 
 ^★ So you can use it to make sure the program never has more than one running at a time.
-
----
-
-# Tools
-
-## `consul-replicate`
-
-* Synchronise the KV store to other datacentres
-* Watches `/foo` here
-* Copies to `/remote/foo` there
-* Keep system/application metadata all together in one place
-
-^I didn't talk about it, but Consul can also operate across multiple datacentres. The catalog is replicated, but the KV is not because there's no way for Consul to know just how much stuff it would be replicating.
-
-^★ `consul-replicate` lets you set up cross-DC replication for the KV
-
-^★ It watches some key space in the store here
-
-^★ And as changes roll in, it stores them in some other key space in the remove DC
-
-^★ Lets you keep all your per-node config accessible in one place. For example, we use Consul to record the version of software deployed on each node. By pulling all that information back into our primary datacentre, we can more easily query the KV for info about the entire world
 
 ---
 
@@ -843,22 +743,6 @@ Success! Data written to: foo/bar
 ^★ Works by reaching out to services on the network and asking them what they're up to.
 
 ^★ And it has native support for Consul service discovery. So once again, it sets up a watch, and when new services appear, it starts to probe them.
-
----
-
-# Tools
-
-## Prometheus
-
-```yaml
-- job_name: consul
-  consul_sd_config:
-    - services:
-        - node_exporter
-        - hopscotch
-```
-
-^The config is basically nothing, just the names of the services you care about.
 
 ---
 
@@ -971,4 +855,4 @@ Success! Data written to: foo/bar
 # [fit] A talk about
 # [fit] Consul
 
-^And that's it. Consul is a whole suite of interesting tools for managing your services, nodes and datacentres. If you're not already using it you should take a look because there might be something in there you can use right now. And if you are using it, look again, because its getting more and more interesting stuff all the time.
+^And that's it. Consul is a whole suite of interesting tools for managing your services, hosts and datacentres. If you're not already using it you should take a look because there might be something in there you can use right now. And if you are using it, look again, because its getting more and more interesting stuff all the time.
